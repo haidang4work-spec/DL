@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Sổ Chi Tiêu Đà Lạt 🌲</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Be Vietnam Pro', sans-serif;
+      background-color: #F4F5F0;
+      color: #1C2520;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .font-mono-receipt { font-family: 'Space Mono', monospace; }
+    .receipt-edge-top {
+      background: linear-gradient(-45deg, #ffffff 8px, transparent 0), linear-gradient(45deg, #ffffff 8px, transparent 0);
+      background-repeat: repeat-x;
+      background-size: 16px 16px;
+      height: 12px;
+      width: 100%;
+    }
+    .receipt-edge-bottom {
+      background: linear-gradient(-135deg, #ffffff 8px, transparent 0), linear-gradient(135deg, #ffffff 8px, transparent 0);
+      background-repeat: repeat-x;
+      background-size: 16px 16px;
+      height: 12px;
+      width: 100%;
+    }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="min-h-screen pb-24">
+
+  <!-- HEADER -->
+  <header class="bg-[#1B4332] text-white pt-5 pb-16 px-4 rounded-b-[2rem] shadow-lg relative">
+    <div class="max-w-lg mx-auto">
+      <div class="flex items-center justify-between gap-2 mb-2">
+        <div class="flex items-center gap-2 flex-1 min-w-0">
+          <span class="text-2xl">🌲</span>
+          <input id="tripTitleInput" type="text" value="Chuyến đi Đà Lạt"
+            class="bg-transparent font-bold text-lg text-white placeholder-emerald-200 focus:outline-none focus:border-b focus:border-emerald-300 truncate w-full"
+            onchange="handleHeaderChange()" />
+        </div>
+        <button onclick="openSettingsModal()" class="text-xs bg-white/15 hover:bg-white/25 px-3 py-1.5 rounded-full font-medium transition shrink-0">
+          ⚙️ Cài đặt & Sync
+        </button>
+      </div>
+
+      <!-- Thanh trạng thái đồng bộ Real-time -->
+      <div class="flex items-center justify-between text-xs text-emerald-200 mt-2">
+        <input id="tripDateInput" type="text" placeholder="VD: 20/11 - 23/11/2026"
+          class="bg-transparent text-emerald-100 placeholder-emerald-300/70 focus:outline-none w-36"
+          onchange="handleHeaderChange()" />
+        
+        <button onclick="syncNow(true)" id="syncStatusBadge"
+          class="flex items-center gap-1.5 bg-emerald-950/60 hover:bg-emerald-950 px-2.5 py-1 rounded-full text-[11px] font-medium transition">
+          <span id="syncDot" class="w-2 h-2 rounded-full bg-stone-400"></span>
+          <span id="syncText">Chưa kết nối</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="max-w-lg mx-auto px-4 -mt-12 space-y-5">
+
+    <!-- DASHBOARD TỔNG QUAN & BÙ TRỪ -->
+    <section class="bg-white rounded-2xl p-5 shadow-md border border-stone-100">
+      <div class="text-center pb-4 border-b border-dashed border-stone-200">
+        <div class="flex items-center justify-center gap-2">
+          <p class="text-xs font-semibold uppercase tracking-wider text-stone-400">Tổng chi tiêu cả chuyến</p>
+          <span id="itemCountBadge" class="text-[10px] bg-stone-100 text-stone-600 px-2 py-0.5 rounded-full font-bold">0 khoản</span>
+        </div>
+        <h1 id="totalTripDisplay" class="text-3xl font-extrabold text-[#1B4332] mt-1">0 ₫</h1>
+      </div>
+
+      <!-- Chi tiết 2 người -->
+      <div class="grid grid-cols-2 gap-3 py-4 border-b border-stone-100">
+        <div class="bg-emerald-50/70 p-3 rounded-xl border border-emerald-100">
+          <div class="flex items-center justify-between mb-1">
+            <span id="p1NameCard" class="text-xs font-bold text-emerald-900 truncate">Người 1</span>
+            <span class="text-[10px] bg-emerald-200/70 text-emerald-900 px-1.5 py-0.5 rounded font-semibold">Đã trả</span>
+          </div>
+          <p id="p1PaidDisplay" class="text-base font-bold text-emerald-800">0 ₫</p>
+          <p class="text-[11px] text-stone-500 mt-0.5">Phần tiêu: <span id="p1ShareDisplay" class="font-semibold text-stone-700">0 ₫</span></p>
+        </div>
+
+        <div class="bg-amber-50/70 p-3 rounded-xl border border-amber-100">
+          <div class="flex items-center justify-between mb-1">
+            <span id="p2NameCard" class="text-xs font-bold text-amber-900 truncate">Người 2</span>
+            <span class="text-[10px] bg-amber-200/70 text-amber-900 px-1.5 py-0.5 rounded font-semibold">Đã trả</span>
+          </div>
+          <p id="p2PaidDisplay" class="text-base font-bold text-amber-800">0 ₫</p>
+          <p class="text-[11px] text-stone-500 mt-0.5">Phần tiêu: <span id="p2ShareDisplay" class="font-semibold text-stone-700">0 ₫</span></p>
+        </div>
+      </div>
+
+      <!-- Kết quả chốt sổ -->
+      <div id="settlementBox" class="mt-4 bg-stone-100 rounded-xl p-3.5 text-center">
+        <p class="text-sm font-semibold text-stone-600">Chưa có dữ liệu chi tiêu</p>
+      </div>
+
+      <!-- Nút xuất dữ liệu -->
+      <div class="grid grid-cols-2 gap-2.5 mt-4">
+        <button onclick="exportToExcel()"
+          class="flex items-center justify-center gap-1.5 bg-[#1B4332] hover:bg-[#143326] active:scale-[0.98] text-white text-xs font-bold py-3 px-3 rounded-xl shadow-sm transition">
+          <span>📊</span> Xuất Excel (.xlsx)
+        </button>
+        <button onclick="openReceiptModal()"
+          class="flex items-center justify-center gap-1.5 bg-[#D97706] hover:bg-[#B45309] active:scale-[0.98] text-white text-xs font-bold py-3 px-3 rounded-xl shadow-sm transition">
+          <span>🧾</span> Xuất Phiếu Hóa Đơn
+        </button>
+      </div>
+    </section>
+
+    <!-- FORM NHẬP KHOẢN CHI -->
+    <section class="bg-white rounded-2xl p-5 shadow-sm border border-stone-100">
+      <div class="flex items-center justify-between mb-3">
+        <h2 id="formTitle" class="text-sm font-extrabold text-stone-800 uppercase tracking-wide">+ Thêm khoản chi mới</h2>
+        <button id="cancelEditBtn" onclick="resetForm()" class="hidden text-xs text-rose-600 font-semibold">Hủy sửa</button>
+      </div>
+
+      <form id="expenseForm" onsubmit="handleSaveExpense(event)" class="space-y-3.5">
+        <input type="hidden" id="editId" value="" />
+
+        <!-- Số tiền -->
+        <div>
+          <label class="block text-xs font-semibold text-stone-500 mb-1">Số tiền (VNĐ)</label>
+          <div class="relative">
+            <input id="amountInput" type="text" inputmode="numeric" placeholder="0" required
+              oninput="formatAmountInput(this)"
+              class="w-full text-2xl font-extrabold text-[#1B4332] bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 focus:outline-none focus:border-[#1B4332] focus:bg-white transition" />
+            <span class="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-stone-400">₫</span>
+          </div>
+          <div class="flex gap-1.5 mt-2 overflow-x-auto no-scrollbar">
+            <button type="button" onclick="appendZeros(3)" class="px-2.5 py-1 bg-stone-100 hover:bg-stone-200 rounded-lg text-xs font-bold text-stone-700">+000</button>
+            <button type="button" onclick="addQuickAmount(50000)" class="px-2.5 py-1 bg-stone-100 hover:bg-stone-200 rounded-lg text-xs font-semibold text-stone-600">+50k</button>
+            <button type="button" onclick="addQuickAmount(100000)" class="px-2.5 py-1 bg-stone-100 hover:bg-stone-200 rounded-lg text-xs font-semibold text-stone-600">+100k</button>
+            <button type="button" onclick="addQuickAmount(200000)" class="px-2.5 py-1 bg-stone-100 hover:bg-stone-200 rounded-lg text-xs font-semibold text-stone-600">+200k</button>
+            <button type="button" onclick="addQuickAmount(500000)" class="px-2.5 py-1 bg-stone-100 hover:bg-stone-200 rounded-lg text-xs font-semibold text-stone-600">+500k</button>
+          </div>
+        </div>
+
+        <!-- Nội dung chi -->
+        <div>
+          <label class="block text-xs font-semibold text-stone-500 mb-1">Nội dung chi tiêu</label>
+          <input id="titleInput" type="text" placeholder="VD: Lẩu gà lá é, Cà phê Túi Mơ To..." required
+            class="w-full text-sm bg-stone-50 border border-stone-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-[#1B4332] focus:bg-white" />
+          <div class="flex gap-1.5 mt-1.5 overflow-x-auto no-scrollbar">
+            <button type="button" onclick="quickFill('Ăn sáng & Cà phê', 'Ăn uống')" class="shrink-0 text-[11px] bg-emerald-50 text-emerald-800 px-2.5 py-1 rounded-full">☕ Ăn sáng & Cà phê</button>
+            <button type="button" onclick="quickFill('Ăn trưa / Tối', 'Ăn uống')" class="shrink-0 text-[11px] bg-emerald-50 text-emerald-800 px-2.5 py-1 rounded-full">🍲 Ăn trưa / Tối</button>
+            <button type="button" onclick="quickFill('Tiền Homestay / Khách sạn', 'Lưu trú')" class="shrink-0 text-[11px] bg-emerald-50 text-emerald-800 px-2.5 py-1 rounded-full">🏡 Homestay</button>
+            <button type="button" onclick="quickFill('Thuê xe máy & Đổ xăng', 'Di chuyển')" class="shrink-0 text-[11px] bg-emerald-50 text-emerald-800 px-2.5 py-1 rounded-full">🛵 Thuê xe & Xăng</button>
+            <button type="button" onclick="quickFill('Vé xe giường nằm', 'Di chuyển')" class="shrink-0 text-[11px] bg-emerald-50 text-emerald-800 px-2.5 py-1 rounded-full">🚌 Vé xe</button>
+          </div>
+        </div>
+
+        <!-- Hạng mục & Ngày -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-stone-500 mb-1">Hạng mục</label>
+            <select id="categoryInput" class="w-full text-sm bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-[#1B4332]">
+              <option value="Ăn uống">🍜 Ăn uống</option>
+              <option value="Cà phê & Check-in">☕ Cà phê & Check-in</option>
+              <option value="Lưu trú">🏡 Lưu trú</option>
+              <option value="Di chuyển">🚗 Di chuyển</option>
+              <option value="Vé tham quan">🎟️ Vé tham quan</option>
+              <option value="Mua quà & Đặc sản">🎁 Mua quà & Đặc sản</option>
+              <option value="Khác">📦 Khác</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-stone-500 mb-1">Ngày chi</label>
+            <input id="dateInput" type="date" required
+              class="w-full text-sm bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-[#1B4332]" />
+          </div>
+        </div>
+
+        <!-- Ai trả? -->
+        <div>
+          <label class="block text-xs font-semibold text-stone-500 mb-1">Ai là người thanh toán?</label>
+          <div class="grid grid-cols-2 gap-2.5">
+            <label class="cursor-pointer">
+              <input type="radio" name="payer" value="P1" checked class="peer sr-only" />
+              <div class="text-center py-2.5 px-3 rounded-xl border border-stone-200 bg-stone-50 peer-checked:bg-emerald-700 peer-checked:text-white peer-checked:border-emerald-700 font-bold text-xs transition truncate">
+                👤 <span id="p1RadioLabel">Người 1</span> trả
+              </div>
+            </label>
+            <label class="cursor-pointer">
+              <input type="radio" name="payer" value="P2" class="peer sr-only" />
+              <div class="text-center py-2.5 px-3 rounded-xl border border-stone-200 bg-stone-50 peer-checked:bg-amber-600 peer-checked:text-white peer-checked:border-amber-600 font-bold text-xs transition truncate">
+                👤 <span id="p2RadioLabel">Người 2</span> trả
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Hình thức chia tiền -->
+        <div>
+          <label class="block text-xs font-semibold text-stone-500 mb-1">Cách tính chia tiền</label>
+          <div class="grid grid-cols-3 gap-2">
+            <label class="cursor-pointer">
+              <input type="radio" name="splitMode" value="50-50" checked class="peer sr-only" />
+              <div class="text-center py-2 px-1.5 rounded-xl border border-stone-200 bg-stone-50 peer-checked:bg-stone-800 peer-checked:text-white peer-checked:border-stone-800 text-[11px] font-bold transition">
+                ⚖️ Chia đôi<br><span class="font-normal opacity-80">(50 / 50)</span>
+              </div>
+            </label>
+            <label class="cursor-pointer">
+              <input type="radio" name="splitMode" value="for-other" class="peer sr-only" />
+              <div class="text-center py-2 px-1.5 rounded-xl border border-stone-200 bg-stone-50 peer-checked:bg-stone-800 peer-checked:text-white peer-checked:border-stone-800 text-[11px] font-bold transition">
+                🤝 Trả hộ<br><span class="font-normal opacity-80">(Người kia 100%)</span>
+              </div>
+            </label>
+            <label class="cursor-pointer">
+              <input type="radio" name="splitMode" value="personal" class="peer sr-only" />
+              <div class="text-center py-2 px-1.5 rounded-xl border border-stone-200 bg-stone-50 peer-checked:bg-stone-800 peer-checked:text-white peer-checked:border-stone-800 text-[11px] font-bold transition">
+                🙋 Chi riêng<br><span class="font-normal opacity-80">(Không chia)</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <button type="submit" id="submitBtn"
+          class="w-full bg-[#1B4332] hover:bg-[#143326] active:scale-[0.99] text-white font-bold py-3.5 rounded-xl shadow-md transition text-sm">
+          💾 Lưu & Đồng bộ
+        </button>
+      </form>
+    </section>
+
+    <!-- DANH SÁCH LỊCH SỬ CHI TIÊU -->
+    <section class="space-y-3">
+      <div class="flex items-center justify-between">
+        <h2 class="text-sm font-extrabold text-stone-800 uppercase tracking-wide">Lịch sử chi tiêu</h2>
+        <select id="filterCategory" onchange="renderAll()"
+          class="text-xs bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 font-medium text-stone-700 focus:outline-none">
+          <option value="ALL">Tất cả hạng mục</option>
+          <option value="Ăn uống">🍜 Ăn uống</option>
+          <option value="Cà phê & Check-in">☕ Cà phê & Check-in</option>
+          <option value="Lưu trú">🏡 Lưu trú</option>
+          <option value="Di chuyển">🚗 Di chuyển</option>
+          <option value="Vé tham quan">🎟️ Vé tham quan</option>
+          <option value="Mua quà & Đặc sản">🎁 Mua quà & Đặc sản</option>
+          <option value="Khác">📦 Khác</option>
+        </select>
+      </div>
+
+      <div id="expenseList" class="space-y-2.5"></div>
+
+      <div class="pt-4 flex items-center justify-between text-xs text-stone-400">
+        <button onclick="syncNow(true)" class="underline hover:text-emerald-700">🔄 Làm mới dữ liệu ngay</button>
+        <button onclick="clearAllData()" class="underline hover:text-rose-600">Xóa toàn bộ dữ liệu</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- MODAL CÀI ĐẶT & ĐỒNG BỘ 2 ĐIỆN THOẠI -->
+  <div id="settingsModal" class="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-xl space-y-4">
+      <h3 class="text-base font-extrabold text-stone-800">⚙️ Cài đặt & Đồng bộ 2 máy</h3>
+      
+      <div class="grid grid-cols-2 gap-2.5">
+        <div>
+          <label class="block text-xs font-semibold text-stone-500 mb-1">Tên Người 1</label>
+          <input id="p1NameInput" type="text" placeholder="VD: Đăng"
+            class="w-full border border-stone-200 rounded-xl px-3 py-2 text-sm font-semibold focus:outline-none focus:border-[#1B4332]" />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-stone-500 mb-1">Tên Người 2</label>
+          <input id="p2NameInput" type="text" placeholder="VD: Thảo"
+            class="w-full border border-stone-200 rounded-xl px-3 py-2 text-sm font-semibold focus:outline-none focus:border-[#1B4332]" />
+        </div>
+      </div>
+
+      <div class="pt-2 border-t border-stone-100">
+        <label class="block text-xs font-bold text-[#1B4332] mb-1">🔗 Link Google Apps Script (Đồng bộ)</label>
+        <input id="scriptUrlInput" type="url" placeholder="https://script.google.com/macros/s/.../exec"
+          class="w-full border border-stone-200 rounded-xl px-3 py-2 text-xs font-mono bg-stone-50 focus:outline-none focus:border-[#1B4332]" />
+        <p class="text-[11px] text-stone-400 mt-1">Dán cùng 1 link này lên cả 2 điện thoại để dữ liệu tự động đồng bộ mỗi 5 giây.</p>
+      </div>
+
+      <div class="flex gap-2 pt-2">
+        <button onclick="closeSettingsModal()" class="flex-1 py-2.5 rounded-xl bg-stone-100 text-stone-700 text-xs font-bold">Đóng</button>
+        <button onclick="saveSettingsFromModal()" class="flex-1 py-2.5 rounded-xl bg-[#1B4332] text-white text-xs font-bold">Lưu & Kết nối</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL PHIẾU HÓA ĐƠN TỔNG KẾT (RECEIPT) -->
+  <div id="receiptModal" class="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 hidden items-center justify-center p-3 overflow-y-auto">
+    <div class="max-w-md w-full my-auto py-4">
+      <div class="flex items-center justify-between gap-2 mb-3">
+        <button onclick="closeReceiptModal()" class="bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-3.5 py-2 rounded-xl">
+          ✕ Đóng
+        </button>
+        <button onclick="downloadReceiptImage()" id="downloadReceiptBtn"
+          class="bg-[#D97706] hover:bg-[#B45309] text-white text-xs font-bold px-4 py-2 rounded-xl shadow-lg flex items-center gap-1.5">
+          <span>📸</span> Tải ảnh hóa đơn (PNG)
+        </button>
+      </div>
+
+      <div id="receiptCaptureArea" class="bg-transparent">
+        <div class="receipt-edge-top"></div>
+        <div class="bg-white px-6 py-5 text-stone-800 shadow-2xl">
+          <div class="text-center border-b-2 border-dashed border-stone-300 pb-4">
+            <p class="font-mono-receipt text-[11px] tracking-widest text-stone-400 uppercase">DALAT TRIP EXPENSE RECEIPT</p>
+            <h2 id="rcTripTitle" class="text-xl font-extrabold text-[#1B4332] mt-1 uppercase">CHUYẾN ĐI ĐÀ LẠT</h2>
+            <p id="rcTripDate" class="text-xs text-stone-500 mt-0.5">Thời gian: ---</p>
+            <p id="rcGeneratedAt" class="font-mono-receipt text-[10px] text-stone-400 mt-1">Xuất phiếu: --/--/----</p>
+          </div>
+
+          <div class="py-4 text-center border-b border-dashed border-stone-300 bg-stone-50/70 -mx-6 px-6">
+            <p class="text-[11px] font-bold uppercase tracking-wider text-stone-500">Tổng chi phí toàn chuyến</p>
+            <p id="rcTotalAmount" class="font-mono-receipt text-3xl font-bold text-[#1B4332] mt-1">0 ₫</p>
+            <p id="rcAvgPerPerson" class="text-xs text-stone-500 mt-1">Trung bình mỗi người: 0 ₫</p>
+          </div>
+
+          <div class="py-4 border-b border-dashed border-stone-300">
+            <p class="text-xs font-extrabold uppercase tracking-wider text-stone-700 mb-3">1. Chi tiêu theo hạng mục</p>
+            <div id="rcCategoryBreakdown" class="space-y-2.5 text-xs"></div>
+          </div>
+
+          <div class="py-4 border-b border-dashed border-stone-300">
+            <p class="text-xs font-extrabold uppercase tracking-wider text-stone-700 mb-2.5">2. Đối soát từng người</p>
+            <div class="space-y-2 text-xs">
+              <div class="flex justify-between items-center">
+                <span class="font-bold text-emerald-900" id="rcP1Label">Người 1:</span>
+                <div class="text-right font-mono-receipt">
+                  <div class="font-bold text-stone-800">Đã trả: <span id="rcP1Paid">0 ₫</span></div>
+                  <div class="text-[11px] text-stone-500">Tiêu thực tế: <span id="rcP1Share">0 ₫</span></div>
+                </div>
+              </div>
+              <div class="flex justify-between items-center pt-1.5 border-t border-stone-100">
+                <span class="font-bold text-amber-900" id="rcP2Label">Người 2:</span>
+                <div class="text-right font-mono-receipt">
+                  <div class="font-bold text-stone-800">Đã trả: <span id="rcP2Paid">0 ₫</span></div>
+                  <div class="text-[11px] text-stone-500">Tiêu thực tế: <span id="rcP2Share">0 ₫</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="pt-4">
+            <div id="rcSettlementBox" class="border-2 border-[#1B4332] bg-emerald-50/60 rounded-xl p-3.5 text-center">
+              <p class="text-[10px] font-bold uppercase tracking-widest text-emerald-800">CHỐT SỔ THANH TOÁN</p>
+              <p id="rcSettlementText" class="text-sm font-extrabold text-[#1B4332] mt-1">Hai người đã cân bằng</p>
+            </div>
+            <div class="text-center mt-4 pt-2">
+              <p class="font-mono-receipt text-[10px] text-stone-400">*** CẢM ƠN VÌ MỘT CHUYẾN ĐI TUYỆT VỜI ***</p>
+            </div>
+          </div>
+        </div>
+        <div class="receipt-edge-bottom"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Dán sẵn link Google Apps Script Web App của bạn vào đây (nếu muốn cố định sẵn trong code)
+    const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyL_c1GY5QriNwHDvRve6JImxEz7Vg365yGtK76hyOlXOIW0lNlw7aq-WR5Lw-K21xhRA/exec';
+
+    const STORAGE_KEY = 'dalat_trip_expenses_v2';
+    const SETTINGS_KEY = 'dalat_trip_settings_v2';
+    const QUEUE_KEY = 'dalat_trip_sync_queue_v2';
+    const URL_KEY = 'dalat_trip_script_url_v2';
+
+    const CATEGORY_ICONS = {
+      'Ăn uống': '🍜',
+      'Cà phê & Check-in': '☕',
+      'Lưu trú': '🏡',
+      'Di chuyển': '🚗',
+      'Vé tham quan': '🎟️',
+      'Mua quà & Đặc sản': '🎁',
+      'Khác': '📦'
+    };
+
+    const SPLIT_LABELS = {
+      '50-50': 'Chia đôi 50/50',
+      'for-other': 'Trả hộ 100%',
+      'personal': 'Chi riêng'
+    };
+
+    let settings = {
+      tripTitle: 'Chuyến đi Đà Lạt',
+      tripDate: '',
+      p1Name: 'Người 1',
+      p2Name: 'Người 2'
+    };
+
+    let expenses = [];
+    let syncQueue = [];
+    let scriptUrl = '';
+    let isSyncing = false;
+    let pollTimer = null;
+
+    function init() {
+      const savedUrl = localStorage.getItem(URL_KEY);
+      scriptUrl = savedUrl !== null ? savedUrl : DEFAULT_SCRIPT_URL;
+
+      const savedSettings = localStorage.getItem(SETTINGS_KEY);
+      if (savedSettings) settings = { ...settings, ...JSON.parse(savedSettings) };
+
+      const savedExpenses = localStorage.getItem(STORAGE_KEY);
+      if (savedExpenses) expenses = JSON.parse(savedExpenses);
+
+      const savedQueue = localStorage.getItem(QUEUE_KEY);
+      if (savedQueue) syncQueue = JSON.parse(savedQueue);
+
+      applySettingsToUI();
+      document.getElementById('dateInput').value = new Date().toISOString().split('T')[0];
+      renderAll();
+
+      // Khởi chạy đồng bộ tự động mỗi 5 giây
+      if (scriptUrl) {
+        syncNow(false);
+      } else {
+        setSyncStatus('disconnected', 'Chưa gắn link Sync');
+      }
+
+      pollTimer = setInterval(() => {
+        if (scriptUrl && document.visibilityState === 'visible') {
+          syncNow(false);
+        }
+      }, 5000);
+
+      // Tự động đẩy dữ liệu ngay khi điện thoại có mạng trở lại
+      window.addEventListener('online', () => {
+        if (scriptUrl) syncNow(false);
+      });
+    }
+
+    function applySettingsToUI() {
+      document.getElementById('tripTitleInput').value = settings.tripTitle;
+      document.getElementById('tripDateInput').value = settings.tripDate;
+      document.getElementById('p1NameCard').textContent = settings.p1Name;
+      document.getElementById('p2NameCard').textContent = settings.p2Name;
+      document.getElementById('p1RadioLabel').textContent = settings.p1Name;
+      document.getElementById('p2RadioLabel').textContent = settings.p2Name;
+    }
+
+    function setSyncStatus(state, text) {
+      const dot = document.getElementById('syncDot');
+      const label = document.getElementById('syncText');
+      label.textContent = text;
+
+      if (state === 'synced') {
+        dot.className = 'w-2 h-2 rounded-full bg-emerald-400';
+      } else if (state === 'syncing') {
+        dot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-ping';
+      } else if (state === 'offline') {
+        dot.className = 'w-2 h-2 rounded-full bg-orange-400';
+      } else {
+        dot.className = 'w-2 h-2 rounded-full bg-stone-400';
+      }
+    }
+
+    function enqueueAction(action) {
+      syncQueue.push(action);
+      localStorage.setItem(QUEUE_KEY, JSON.stringify(syncQueue));
+      if (scriptUrl) {
+        syncNow(false);
+      }
+    }
+
+    // Lõi đồng bộ 2 chiều với Google Sheets
+    async function syncNow(manual = false) {
+      if (!scriptUrl) {
+        if (manual) openSettingsModal();
+        return;
+      }
+      if (isSyncing) return;
+      if (!navigator.onLine) {
+        setSyncStatus('offline', `Offline (${syncQueue.length} chờ gửi)`);
+        return;
+      }
+
+      isSyncing = true;
+      setSyncStatus('syncing', 'Đang đồng bộ...');
+
+      try {
+        // 1. Đẩy các thay đổi từ máy này lên Google Sheets trước (nếu có)
+        if (syncQueue.length > 0) {
+          const batchToSend = [...syncQueue];
+          const postRes = await fetch(scriptUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ queue: batchToSend }),
+            redirect: 'follow'
+          });
+          const postJson = await postRes.json();
+          if (postJson.status === 'ok') {
+            syncQueue = syncQueue.slice(batchToSend.length);
+            localStorage.setItem(QUEUE_KEY, JSON.stringify(syncQueue));
+          }
+        }
+
+        // 2. Kéo dữ liệu mới nhất từ Google Sheets về
+        const getRes = await fetch(`${scriptUrl}?t=${Date.now()}`, { redirect: 'follow' });
+        const data = await getRes.json();
+
+        if (data.status === 'ok') {
+          // Chỉ cập nhật UI nếu không có thao tác mới phát sinh trong lúc đang fetch
+          if (syncQueue.length === 0) {
+            const prevExpStr = JSON.stringify(expenses);
+            const prevSetStr = JSON.stringify(settings);
+
+            expenses = data.expenses || [];
+            if (data.settings) {
+              settings = {
+                tripTitle: data.settings.tripTitle || settings.tripTitle,
+                tripDate: data.settings.tripDate !== undefined ? data.settings.tripDate : settings.tripDate,
+                p1Name: data.settings.p1Name || settings.p1Name,
+                p2Name: data.settings.p2Name || settings.p2Name
+              };
+            }
+
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(expenses));
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+
+            if (JSON.stringify(settings) !== prevSetStr) {
+              applySettingsToUI();
+            }
+            if (JSON.stringify(expenses) !== prevExpStr || JSON.stringify(settings) !== prevSetStr) {
+              renderAll();
+            }
+          }
+
+          const now = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          setSyncStatus('synced', `Đã đồng bộ ${now}`);
+        }
+      } catch (err) {
+        setSyncStatus('offline', syncQueue.length > 0 ? `Chờ gửi (${syncQueue.length})` : 'Lỗi kết nối');
+      } finally {
+        isSyncing = false;
+      }
+    }
+
+    function handleHeaderChange() {
+      settings.tripTitle = document.getElementById('tripTitleInput').value.trim() || 'Chuyến đi Đà Lạt';
+      settings.tripDate = document.getElementById('tripDateInput').value.trim();
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+      enqueueAction({ type: 'settings', data: settings });
+    }
+
+    // Modal Cài đặt
+    function openSettingsModal() {
+      document.getElementById('p1NameInput').value = settings.p1Name;
+      document.getElementById('p2NameInput').value = settings.p2Name;
+      document.getElementById('scriptUrlInput').value = scriptUrl;
+      document.getElementById('settingsModal').classList.remove('hidden');
+      document.getElementById('settingsModal').classList.add('flex');
+    }
+
+    function closeSettingsModal() {
+      document.getElementById('settingsModal').classList.add('hidden');
+      document.getElementById('settingsModal').classList.remove('flex');
+    }
+
+    function saveSettingsFromModal() {
+      settings.p1Name = document.getElementById('p1NameInput').value.trim() || 'Người 1';
+      settings.p2Name = document.getElementById('p2NameInput').value.trim() || 'Người 2';
+      scriptUrl = document.getElementById('scriptUrlInput').value.trim();
+
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+      localStorage.setItem(URL_KEY, scriptUrl);
+
+      applySettingsToUI();
+      renderAll();
+      closeSettingsModal();
+
+      if (scriptUrl) {
+        enqueueAction({ type: 'settings', data: settings });
+      } else {
+        setSyncStatus('disconnected', 'Chưa gắn link Sync');
+      }
+    }
+
+    // Format tiền tệ
+    function formatVND(num) {
+      return Math.round(num).toLocaleString('vi-VN') + ' ₫';
+    }
+
+    function parseRawAmount(str) {
+      return parseInt(String(str).replace(/\D/g, ''), 10) || 0;
+    }
+
+    function formatAmountInput(el) {
+      const raw = parseRawAmount(el.value);
+      el.value = raw > 0 ? raw.toLocaleString('vi-VN') : '';
+    }
+
+    function appendZeros(count) {
+      const el = document.getElementById('amountInput');
+      const raw = parseRawAmount(el.value);
+      if (raw > 0) el.value = (raw * Math.pow(10, count)).toLocaleString('vi-VN');
+    }
+
+    function addQuickAmount(val) {
+      const el = document.getElementById('amountInput');
+      const raw = parseRawAmount(el.value);
+      el.value = (raw + val).toLocaleString('vi-VN');
+    }
+
+    function quickFill(title, category) {
+      document.getElementById('titleInput').value = title;
+      document.getElementById('categoryInput').value = category;
+    }
+
+    // Tính toán tổng hợp & bù trừ
+    function calculateSummary() {
+      let totalTrip = 0, p1Paid = 0, p2Paid = 0, p1Share = 0, p2Share = 0;
+      const categoryTotals = {};
+
+      expenses.forEach(item => {
+        const amt = Number(item.amount);
+        totalTrip += amt;
+
+        if (!categoryTotals[item.category]) categoryTotals[item.category] = 0;
+        categoryTotals[item.category] += amt;
+
+        if (item.payer === 'P1') p1Paid += amt;
+        else p2Paid += amt;
+
+        if (item.splitMode === '50-50') {
+          p1Share += amt / 2;
+          p2Share += amt / 2;
+        } else if (item.splitMode === 'for-other') {
+          if (item.payer === 'P1') p2Share += amt;
+          else p1Share += amt;
+        } else if (item.splitMode === 'personal') {
+          if (item.payer === 'P1') p1Share += amt;
+          else p2Share += amt;
+        }
+      });
+
+      const p1Net = p1Paid - p1Share;
+      return { totalTrip, p1Paid, p2Paid, p1Share, p2Share, p1Net, categoryTotals };
+    }
+
+    // Lưu / Cập nhật khoản chi
+    function handleSaveExpense(e) {
+      e.preventDefault();
+      const amount = parseRawAmount(document.getElementById('amountInput').value);
+      if (amount <= 0) {
+        alert('Vui lòng nhập số tiền hợp lệ!');
+        return;
+      }
+
+      const editId = document.getElementById('editId').value;
+      const title = document.getElementById('titleInput').value.trim();
+      const category = document.getElementById('categoryInput').value;
+      const date = document.getElementById('dateInput').value;
+      const payer = document.querySelector('input[name="payer"]:checked').value;
+      const splitMode = document.querySelector('input[name="splitMode"]:checked').value;
+      const now = Date.now();
+
+      let targetItem;
+
+      if (editId) {
+        const idx = expenses.findIndex(x => x.id === editId);
+        if (idx > -1) {
+          targetItem = { ...expenses[idx], amount, title, category, date, payer, splitMode, updatedAt: now };
+          expenses[idx] = targetItem;
+        }
+      } else {
+        targetItem = {
+          id: 'exp_' + now + '_' + Math.random().toString(36).slice(2, 6),
+          amount,
+          title,
+          category,
+          date,
+          payer,
+          splitMode,
+          updatedAt: now
+        };
+        expenses.unshift(targetItem);
+      }
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(expenses));
+      resetForm();
+      renderAll();
+
+      if (targetItem) {
+        enqueueAction({ type: 'upsert', data: targetItem });
+      }
+    }
+
+    function editExpense(id) {
+      const item = expenses.find(x => x.id === id);
+      if (!item) return;
+
+      document.getElementById('editId').value = item.id;
+      document.getElementById('amountInput').value = item.amount.toLocaleString('vi-VN');
+      document.getElementById('titleInput').value = item.title;
+      document.getElementById('categoryInput').value = item.category;
+      document.getElementById('dateInput').value = item.date;
+      document.querySelector(`input[name="payer"][value="${item.payer}"]`).checked = true;
+      document.querySelector(`input[name="splitMode"][value="${item.splitMode}"]`).checked = true;
+
+      document.getElementById('formTitle').textContent = '✏️ Đang sửa khoản chi';
+      document.getElementById('submitBtn').textContent = '✅ Cập nhật & Đồng bộ';
+      document.getElementById('cancelEditBtn').classList.remove('hidden');
+
+      window.scrollTo({ top: 180, behavior: 'smooth' });
+    }
+
+    function deleteExpense(id) {
+      if (!confirm('Xóa khoản chi này trên cả 2 máy?')) return;
+      expenses = expenses.filter(x => x.id !== id);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(expenses));
+      renderAll();
+      enqueueAction({ type: 'delete', id });
+    }
+
+    function resetForm() {
+      document.getElementById('editId').value = '';
+      document.getElementById('amountInput').value = '';
+      document.getElementById('titleInput').value = '';
+      document.getElementById('formTitle').textContent = '+ Thêm khoản chi mới';
+      document.getElementById('submitBtn').textContent = '💾 Lưu & Đồng bộ';
+      document.getElementById('cancelEditBtn').classList.add('hidden');
+    }
+
+    // Render toàn bộ giao diện
+    function renderAll() {
+      const { totalTrip, p1Paid, p2Paid, p1Share, p2Share, p1Net } = calculateSummary();
+
+      document.getElementById('itemCountBadge').textContent = `${expenses.length} khoản`;
+      document.getElementById('totalTripDisplay').textContent = formatVND(totalTrip);
+      document.getElementById('p1PaidDisplay').textContent = formatVND(p1Paid);
+      document.getElementById('p2PaidDisplay').textContent = formatVND(p2Paid);
+      document.getElementById('p1ShareDisplay').textContent = formatVND(p1Share);
+      document.getElementById('p2ShareDisplay').textContent = formatVND(p2Share);
+
+      const settlementBox = document.getElementById('settlementBox');
+      if (expenses.length === 0) {
+        settlementBox.className = 'mt-4 bg-stone-100 rounded-xl p-3.5 text-center';
+        settlementBox.innerHTML = `<p class="text-xs font-medium text-stone-500">Hãy thêm khoản chi đầu tiên của chuyến đi nhé!</p>`;
+      } else if (Math.abs(p1Net) < 1) {
+        settlementBox.className = 'mt-4 bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 text-center';
+        settlementBox.innerHTML = `<p class="text-sm font-bold text-emerald-800">🎉 Hai người đã chi tiêu cân bằng, không cần bù trừ!</p>`;
+      } else if (p1Net > 0) {
+        settlementBox.className = 'mt-4 bg-amber-50 border border-amber-200 rounded-xl p-3.5 text-center';
+        settlementBox.innerHTML = `
+          <p class="text-[11px] uppercase tracking-wider font-bold text-amber-700">Chốt sổ bù trừ</p>
+          <p class="text-sm font-extrabold text-stone-800 mt-0.5">
+            <span class="text-amber-700">${escapeHtml(settings.p2Name)}</span> cần chuyển cho <span class="text-emerald-800">${escapeHtml(settings.p1Name)}</span>:
+            <span class="block text-lg text-[#1B4332] mt-0.5">${formatVND(p1Net)}</span>
+          </p>`;
+      } else {
+        settlementBox.className = 'mt-4 bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 text-center';
+        settlementBox.innerHTML = `
+          <p class="text-[11px] uppercase tracking-wider font-bold text-emerald-700">Chốt sổ bù trừ</p>
+          <p class="text-sm font-extrabold text-stone-800 mt-0.5">
+            <span class="text-emerald-800">${escapeHtml(settings.p1Name)}</span> cần chuyển cho <span class="text-amber-700">${escapeHtml(settings.p2Name)}</span>:
+            <span class="block text-lg text-[#1B4332] mt-0.5">${formatVND(Math.abs(p1Net))}</span>
+          </p>`;
+      }
+
+      const filterCat = document.getElementById('filterCategory').value;
+      const listEl = document.getElementById('expenseList');
+      const filtered = filterCat === 'ALL' ? expenses : expenses.filter(x => x.category === filterCat);
+
+      if (filtered.length === 0) {
+        listEl.innerHTML = `
+          <div class="bg-white rounded-2xl p-8 text-center border border-dashed border-stone-200">
+            <p class="text-2xl mb-1">🌲</p>
+            <p class="text-xs text-stone-400">Chưa có khoản chi nào trong mục này</p>
+          </div>`;
+        return;
+      }
+
+      listEl.innerHTML = filtered.map(item => {
+        const payerName = item.payer === 'P1' ? settings.p1Name : settings.p2Name;
+        const badgeColor = item.payer === 'P1' ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-900';
+        const icon = CATEGORY_ICONS[item.category] || '📦';
+        const dateFormatted = item.date ? item.date.split('-').reverse().join('/') : '';
+
+        return `
+          <div class="bg-white rounded-2xl p-3.5 shadow-xs border border-stone-100 flex items-center justify-between gap-3">
+            <div class="flex items-start gap-3 min-w-0">
+              <div class="w-10 h-10 rounded-xl bg-stone-100 flex items-center justify-center text-lg shrink-0">${icon}</div>
+              <div class="min-w-0">
+                <p class="text-sm font-bold text-stone-800 truncate">${escapeHtml(item.title)}</p>
+                <div class="flex flex-wrap items-center gap-1.5 mt-1">
+                  <span class="text-[10px] font-bold px-2 py-0.5 rounded-md ${badgeColor}">${escapeHtml(payerName)} trả</span>
+                  <span class="text-[10px] bg-stone-100 text-stone-600 px-2 py-0.5 rounded-md font-medium">${SPLIT_LABELS[item.splitMode]}</span>
+                  <span class="text-[10px] text-stone-400">${dateFormatted}</span>
+                </div>
+              </div>
+            </div>
+            <div class="text-right shrink-0">
+              <p class="text-sm font-extrabold text-[#1B4332]">${formatVND(item.amount)}</p>
+              <div class="flex items-center justify-end gap-2 mt-1.5">
+                <button onclick="editExpense('${item.id}')" class="text-[11px] text-stone-400 hover:text-emerald-700 font-semibold">Sửa</button>
+                <button onclick="deleteExpense('${item.id}')" class="text-[11px] text-stone-400 hover:text-rose-600 font-semibold">Xóa</button>
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // XUẤT EXCEL (.xlsx)
+    function exportToExcel() {
+      if (expenses.length === 0) {
+        alert('Chưa có khoản chi nào để xuất Excel!');
+        return;
+      }
+
+      const { totalTrip, p1Paid, p2Paid, p1Share, p2Share, p1Net, categoryTotals } = calculateSummary();
+
+      const detailRows = expenses.map((item, idx) => {
+        let p1Part = 0, p2Part = 0;
+        if (item.splitMode === '50-50') {
+          p1Part = item.amount / 2;
+          p2Part = item.amount / 2;
+        } else if (item.splitMode === 'for-other') {
+          if (item.payer === 'P1') p2Part = item.amount;
+          else p1Part = item.amount;
+        } else {
+          if (item.payer === 'P1') p1Part = item.amount;
+          else p2Part = item.amount;
+        }
+
+        return {
+          'STT': idx + 1,
+          'Ngày chi': item.date ? item.date.split('-').reverse().join('/') : '',
+          'Hạng mục': item.category,
+          'Nội dung chi tiêu': item.title,
+          'Số tiền (VNĐ)': item.amount,
+          'Người thanh toán': item.payer === 'P1' ? settings.p1Name : settings.p2Name,
+          'Hình thức chia': SPLIT_LABELS[item.splitMode],
+          [`Phần của ${settings.p1Name} (VNĐ)`]: p1Part,
+          [`Phần của ${settings.p2Name} (VNĐ)`]: p2Part
+        };
+      });
+
+      let settlementSummary = 'Hai người đã cân bằng chi tiêu';
+      if (p1Net > 0) {
+        settlementSummary = `${settings.p2Name} chuyển trả cho ${settings.p1Name}: ${Math.round(p1Net).toLocaleString('vi-VN')} VNĐ`;
+      } else if (p1Net < 0) {
+        settlementSummary = `${settings.p1Name} chuyển trả cho ${settings.p2Name}: ${Math.round(Math.abs(p1Net)).toLocaleString('vi-VN')} VNĐ`;
+      }
+
+      const summaryRows = [
+        { 'Mục': 'Tên chuyến đi', 'Giá trị': settings.tripTitle },
+        { 'Mục': 'Thời gian', 'Giá trị': settings.tripDate || 'Không ghi chú' },
+        { 'Mục': 'Tổng chi phí toàn chuyến (VNĐ)', 'Giá trị': totalTrip },
+        { 'Mục': '', 'Giá trị': '' },
+        { 'Mục': `Tổng tiền ${settings.p1Name} đã ứng trả (VNĐ)`, 'Giá trị': p1Paid },
+        { 'Mục': `Chi phí thực tế của ${settings.p1Name} (VNĐ)`, 'Giá trị': p1Share },
+        { 'Mục': `Tổng tiền ${settings.p2Name} đã ứng trả (VNĐ)`, 'Giá trị': p2Paid },
+        { 'Mục': `Chi phí thực tế của ${settings.p2Name} (VNĐ)`, 'Giá trị': p2Share },
+        { 'Mục': '', 'Giá trị': '' },
+        { 'Mục': 'CHỐT SỔ BÙ TRỪ', 'Giá trị': settlementSummary },
+        { 'Mục': '', 'Giá trị': '' },
+        { 'Mục': '--- THỐNG KÊ THEO HẠNG MỤC ---', 'Giá trị': 'Số tiền (VNĐ)' }
+      ];
+
+      Object.entries(categoryTotals)
+        .sort((a, b) => b[1] - a[1])
+        .forEach(([cat, val]) => summaryRows.push({ 'Mục': cat, 'Giá trị': val }));
+
+      const wb = XLSX.utils.book_new();
+      const ws1 = XLSX.utils.json_to_sheet(detailRows);
+      const ws2 = XLSX.utils.json_to_sheet(summaryRows);
+
+      ws1['!cols'] = [
+        { wch: 6 }, { wch: 14 }, { wch: 20 }, { wch: 32 },
+        { wch: 16 }, { wch: 18 }, { wch: 18 }, { wch: 20 }, { wch: 20 }
+      ];
+      ws2['!cols'] = [{ wch: 38 }, { wch: 42 }];
+
+      XLSX.utils.book_append_sheet(wb, ws2, 'Tong_Ket_Chot_So');
+      XLSX.utils.book_append_sheet(wb, ws1, 'Chi_Tiet_Chi_Tieu');
+
+      const safeName = settings.tripTitle.replace(/[^a-zA-Z0-9\u00C0-\u1EF9]/g, '_');
+      XLSX.writeFile(wb, `So_Chi_Tieu_${safeName}.xlsx`);
+    }
+
+    // PHIẾU HÓA ĐƠN TỔNG KẾT
+    function openReceiptModal() {
+      if (expenses.length === 0) {
+        alert('Chưa có khoản chi nào để xuất hóa đơn!');
+        return;
+      }
+
+      const { totalTrip, p1Paid, p2Paid, p1Share, p2Share, p1Net, categoryTotals } = calculateSummary();
+      const now = new Date();
+      const timeStr = `${now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - ${now.toLocaleDateString('vi-VN')}`;
+
+      document.getElementById('rcTripTitle').textContent = settings.tripTitle;
+      document.getElementById('rcTripDate').textContent = settings.tripDate ? `Thời gian: ${settings.tripDate}` : `Tổng cộng ${expenses.length} giao dịch`;
+      document.getElementById('rcGeneratedAt').textContent = `Xuất phiếu: ${timeStr}`;
+      document.getElementById('rcTotalAmount').textContent = formatVND(totalTrip);
+      document.getElementById('rcAvgPerPerson').textContent = `Trung bình mỗi người: ${formatVND(totalTrip / 2)}`;
+
+      const sortedCats = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1]);
+      document.getElementById('rcCategoryBreakdown').innerHTML = sortedCats.map(([cat, amt]) => {
+        const pct = totalTrip > 0 ? Math.round((amt / totalTrip) * 100) : 0;
+        const icon = CATEGORY_ICONS[cat] || '📦';
+        return `
+          <div>
+            <div class="flex justify-between items-center mb-1">
+              <span class="font-semibold text-stone-700">${icon} ${cat} <span class="text-stone-400 font-normal">(${pct}%)</span></span>
+              <span class="font-mono-receipt font-bold text-stone-900">${formatVND(amt)}</span>
+            </div>
+            <div class="w-full bg-stone-100 h-1.5 rounded-full overflow-hidden">
+              <div class="bg-[#1B4332] h-full rounded-full" style="width: ${pct}%"></div>
+            </div>
+          </div>`;
+      }).join('');
+
+      document.getElementById('rcP1Label').textContent = settings.p1Name;
+      document.getElementById('rcP2Label').textContent = settings.p2Name;
+      document.getElementById('rcP1Paid').textContent = formatVND(p1Paid);
+      document.getElementById('rcP1Share').textContent = formatVND(p1Share);
+      document.getElementById('rcP2Paid').textContent = formatVND(p2Paid);
+      document.getElementById('rcP2Share').textContent = formatVND(p2Share);
+
+      const rcSettleText = document.getElementById('rcSettlementText');
+      if (Math.abs(p1Net) < 1) {
+        rcSettleText.innerHTML = 'Hai người đã cân bằng chi tiêu 🎉';
+      } else if (p1Net > 0) {
+        rcSettleText.innerHTML = `${escapeHtml(settings.p2Name)} chuyển cho ${escapeHtml(settings.p1Name)}<br><span class="font-mono-receipt text-xl text-[#D97706]">${formatVND(p1Net)}</span>`;
+      } else {
+        rcSettleText.innerHTML = `${escapeHtml(settings.p1Name)} chuyển cho ${escapeHtml(settings.p2Name)}<br><span class="font-mono-receipt text-xl text-[#D97706]">${formatVND(Math.abs(p1Net))}</span>`;
+      }
+
+      document.getElementById('receiptModal').classList.remove('hidden');
+      document.getElementById('receiptModal').classList.add('flex');
+    }
+
+    function closeReceiptModal() {
+      document.getElementById('receiptModal').classList.add('hidden');
+      document.getElementById('receiptModal').classList.remove('flex');
+    }
+
+    async function downloadReceiptImage() {
+      const btn = document.getElementById('downloadReceiptBtn');
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '⏳ Đang tạo ảnh...';
+      btn.disabled = true;
+
+      try {
+        const target = document.getElementById('receiptCaptureArea');
+        const canvas = await html2canvas(target, {
+          scale: 2,
+          backgroundColor: '#F4F5F0',
+          useCORS: true
+        });
+        const link = document.createElement('a');
+        link.download = `Hoa_Don_${settings.tripTitle.replace(/\s+/g, '_')}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      } catch (err) {
+        alert('Không thể tự động tải ảnh trên trình duyệt này, bạn có thể chụp màn hình phiếu hóa đơn nhé!');
+      } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+      }
+    }
+
+    function clearAllData() {
+      if (!confirm('Bạn chắc chắn muốn xóa toàn bộ dữ liệu trên cả 2 điện thoại?')) return;
+      expenses = [];
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(expenses));
+      renderAll();
+      enqueueAction({ type: 'clearAll' });
+    }
+
+    init();
+  </script>
+</body>
+</html>
